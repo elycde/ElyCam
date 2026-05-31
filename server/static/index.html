@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>ElyCam Viewer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Full-screen video element for the WebRTC stream -->
+  <video id="video" autoplay playsinline muted></video>
+
+  <!-- Connection status overlay — centered, fades out when streaming -->
+  <div id="status-overlay">
+    <div class="status-content">
+      <span class="pulse-dot"></span>
+      <span id="status-text">Connecting…</span>
+    </div>
+  </div>
+
+  <!-- Stats overlay — small text in bottom-right corner -->
+  <div id="stats-overlay"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Xcode
+*.xcodeproj/
+!ios/ElyCam/project.yml
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.spec
+venv/
+.venv/
+env/
+
+# PyInstaller
+*.manifest
+*.exe
+
+# IDE
+.vscode/
+.idea/
+
+# System
+Thumbs.db
+*.log

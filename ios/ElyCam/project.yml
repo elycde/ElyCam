@@ -1,0 +1,31 @@
+name: ElyCam
+options:
+  bundleIdPrefix: com.elycde
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  WebRTC:
+    url: https://github.com/nicklama/nicklama-webrtc-build
+    from: "130.0.0"
+targets:
+  ElyCam:
+    type: application
+    platform: iOS
+    sources:
+      - path: ElyCam
+    dependencies:
+      - package: WebRTC
+    settings:
+      base:
+        INFOPLIST_FILE: ElyCam/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.elycde.elycam
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: ""
+        PROVISIONING_PROFILE_SPECIFIER: ""

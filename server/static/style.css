@@ -1,0 +1,114 @@
+/* ============================================================
+   ElyCam Viewer – OBS Browser Source Styles
+   ============================================================ */
+
+/* --- Reset & base --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+/* --- Video element: fills the entire viewport --- */
+video {
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
+
+/* --- Connection status overlay (centered) --- */
+#status-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+#status-overlay.hidden {
+  opacity: 0;
+}
+
+.status-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* --- Pulsing dot animation for "connecting" state --- */
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b; /* amber */
+  flex-shrink: 0;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.pulse-dot.connected {
+  background: #22c55e; /* green */
+  animation: none;
+}
+
+.pulse-dot.error {
+  background: #ef4444; /* red */
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+/* --- Stats overlay (bottom-right corner) --- */
+#stats-overlay {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  z-index: 90;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: pre;
+  /* Hidden until we have data */
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#stats-overlay.visible {
+  opacity: 1;
+}

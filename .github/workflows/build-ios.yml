@@ -1,0 +1,167 @@
+# ============================================================================
+# ElyCam — CI Build Pipeline
+# ============================================================================
+# Builds both iOS IPA and Windows Server EXE on every push/PR.
+# Artifacts are available for download from the Actions tab.
+# For GitHub Releases with versioned assets, see release.yml
+# ============================================================================
+
+name: "🔨 Build"
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ════════════════════════════════════════════════════════════════════════
+  # Job 1: Build iOS IPA
+  # ════════════════════════════════════════════════════════════════════════
+  build-ios:
+    name: "📱 iOS IPA"
+    runs-on: macos-15
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Select Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using: $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH"
+          xcodebuild -version
+
+      - name: 📦 Install XcodeGen
+        run: brew install xcodegen
+
+      - name: 🏗️ Generate Xcode Project
+        working-directory: ios/ElyCam
+        run: xcodegen generate
+
+      - name: 📚 Resolve SPM Dependencies
+        working-directory: ios/ElyCam
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project ElyCam.xcodeproj \
+            -scheme ElyCam \
+            -clonedSourcePackagesDirPath ../spm_cache
+
+      - name: 🔨 Build
+        working-directory: ios/ElyCam
+        run: |
+          xcodebuild build \
+            -project ElyCam.xcodeproj \
+            -scheme ElyCam \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            -clonedSourcePackagesDirPath ../spm_cache \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: 📦 Package IPA
+        working-directory: ios/ElyCam
+        run: |
+          APP_PATH=$(find build -name "ElyCam.app" -type d | head -1)
+          mkdir -p package/Payload
+          cp -r "$APP_PATH" package/Payload/
+          cd package && zip -r ../ElyCam-unsigned.ipa Payload/ -x "*.DS_Store"
+          echo "✅ Created ElyCam-unsigned.ipa"
+
+      - name: 📤 Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElyCam-iOS-unsigned
+          path: ios/ElyCam/ElyCam-unsigned.ipa
+          retention-days: 14
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Job 2: Build Server EXE
+  # ════════════════════════════════════════════════════════════════════════
+  build-server:
+    name: "🖥️ Server EXE"
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        working-directory: server
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 🔨 Build EXE
+        working-directory: server
+        run: |
+          pyinstaller `
+            --onefile `
+            --name "ElyCam-Server" `
+            --add-data "static;static" `
+            --console `
+            --hidden-import uvicorn.logging `
+            --hidden-import uvicorn.loops `
+            --hidden-import uvicorn.loops.auto `
+            --hidden-import uvicorn.protocols `
+            --hidden-import uvicorn.protocols.http `
+            --hidden-import uvicorn.protocols.http.auto `
+            --hidden-import uvicorn.protocols.websockets `
+            --hidden-import uvicorn.protocols.websockets.auto `
+            --hidden-import uvicorn.lifespan `
+            --hidden-import uvicorn.lifespan.on `
+            --hidden-import uvicorn.lifespan.off `
+            --collect-submodules uvicorn `
+            --collect-submodules fastapi `
+            main.py
+
+      - name: ✅ Verify EXE
+        working-directory: server
+        run: |
+          $exe = "dist\ElyCam-Server.exe"
+          if (Test-Path $exe) {
+            $size = (Get-Item $exe).Length / 1MB
+            echo "✅ ElyCam-Server.exe built ($([math]::Round($size, 1)) MB)"
+          } else {
+            echo "❌ Build failed"
+            exit 1
+          }
+
+      - name: 📤 Upload Server EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElyCam-Server-windows-x64
+          path: server/dist/ElyCam-Server.exe
+          retention-days: 14
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Summary
+  # ════════════════════════════════════════════════════════════════════════
+  summary:
+    name: "📊 Summary"
+    needs: [build-ios, build-server]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📊 Build Report
+        run: |
+          echo "## 📦 ElyCam Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📱 iOS IPA | ${{ needs.build-ios.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🖥️ Server EXE | ${{ needs.build-server.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts from the **Artifacts** section below." >> $GITHUB_STEP_SUMMARY

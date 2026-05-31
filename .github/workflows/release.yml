@@ -1,0 +1,227 @@
+# ============================================================================
+# ElyCam — Release Pipeline
+# ============================================================================
+# Triggers on version tags (v1.0.0, v1.2.3, etc.)
+# Builds:
+#   1. iOS IPA (unsigned) on macOS
+#   2. Python Server EXE (PyInstaller) on Windows
+# Publishes both as GitHub Release assets.
+#
+# Usage:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+# ============================================================================
+
+name: "🚀 Release"
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  # ════════════════════════════════════════════════════════════════════════
+  # Job 1: Build iOS IPA (macOS runner)
+  # ════════════════════════════════════════════════════════════════════════
+  build-ios:
+    name: "📱 Build iOS IPA"
+    runs-on: macos-15
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Select Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using: $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH"
+          xcodebuild -version
+
+      - name: 📦 Install XcodeGen
+        run: brew install xcodegen
+
+      - name: 🏗️ Generate Xcode Project
+        working-directory: ios/ElyCam
+        run: xcodegen generate
+
+      - name: 📚 Resolve SPM Dependencies
+        working-directory: ios/ElyCam
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project ElyCam.xcodeproj \
+            -scheme ElyCam \
+            -clonedSourcePackagesDirPath ../spm_cache
+
+      - name: 🔨 Build
+        working-directory: ios/ElyCam
+        run: |
+          xcodebuild build \
+            -project ElyCam.xcodeproj \
+            -scheme ElyCam \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            -clonedSourcePackagesDirPath ../spm_cache \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ONLY_ACTIVE_ARCH=NO \
+            MARKETING_VERSION="${VERSION#v}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}"
+
+      - name: 📦 Package IPA
+        working-directory: ios/ElyCam
+        run: |
+          APP_PATH=$(find build -name "ElyCam.app" -type d | head -1)
+          mkdir -p package/Payload
+          cp -r "$APP_PATH" package/Payload/
+          cd package && zip -r ../ElyCam-${VERSION}-unsigned.ipa Payload/ -x "*.DS_Store"
+          echo "✅ IPA: ElyCam-${VERSION}-unsigned.ipa"
+
+      - name: 📤 Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ios/ElyCam/ElyCam-${{ env.VERSION }}-unsigned.ipa
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Job 2: Build Server EXE (Windows runner)
+  # ════════════════════════════════════════════════════════════════════════
+  build-server:
+    name: "🖥️ Build Server EXE"
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        working-directory: server
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 🔨 Build EXE with PyInstaller
+        working-directory: server
+        run: |
+          pyinstaller `
+            --onefile `
+            --name "ElyCam-Server" `
+            --add-data "static;static" `
+            --icon "NONE" `
+            --console `
+            --hidden-import uvicorn.logging `
+            --hidden-import uvicorn.loops `
+            --hidden-import uvicorn.loops.auto `
+            --hidden-import uvicorn.protocols `
+            --hidden-import uvicorn.protocols.http `
+            --hidden-import uvicorn.protocols.http.auto `
+            --hidden-import uvicorn.protocols.websockets `
+            --hidden-import uvicorn.protocols.websockets.auto `
+            --hidden-import uvicorn.lifespan `
+            --hidden-import uvicorn.lifespan.on `
+            --hidden-import uvicorn.lifespan.off `
+            --collect-submodules uvicorn `
+            --collect-submodules fastapi `
+            main.py
+
+      - name: 📦 Package Server
+        working-directory: server
+        shell: pwsh
+        run: |
+          $exePath = "dist\ElyCam-Server.exe"
+          $outName = "ElyCam-Server-${{ env.VERSION }}-windows-x64.zip"
+          
+          # Create archive with EXE + README
+          Compress-Archive -Path $exePath -DestinationPath "dist\$outName"
+          echo "✅ Server package: $outName"
+          
+          # Show size
+          $size = (Get-Item "dist\$outName").Length / 1MB
+          echo "Size: $([math]::Round($size, 1)) MB"
+
+      - name: 📤 Upload Server EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-exe
+          path: server/dist/ElyCam-Server-${{ env.VERSION }}-windows-x64.zip
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Job 3: Create GitHub Release
+  # ════════════════════════════════════════════════════════════════════════
+  release:
+    name: "🚀 Create Release"
+    needs: [build-ios, build-server]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📥 Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: release-assets/
+
+      - name: 📥 Download Server EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: server-exe
+          path: release-assets/
+
+      - name: 📋 List Assets
+        run: |
+          echo "Release assets:"
+          ls -lh release-assets/
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "ElyCam ${{ env.VERSION }}"
+          draft: false
+          prerelease: ${{ contains(env.VERSION, '-beta') || contains(env.VERSION, '-alpha') || contains(env.VERSION, '-rc') }}
+          generate_release_notes: true
+          body: |
+            ## 📦 Downloads
+
+            | File | Description |
+            |------|-------------|
+            | `ElyCam-${{ env.VERSION }}-unsigned.ipa` | iOS app (install via AltStore/Sideloadly) |
+            | `ElyCam-Server-${{ env.VERSION }}-windows-x64.zip` | Windows server (standalone EXE) |
+
+            ## 🚀 Quick Start
+
+            ### Server (Windows PC)
+            1. Download and unzip `ElyCam-Server-${{ env.VERSION }}-windows-x64.zip`
+            2. Run `ElyCam-Server.exe`
+            3. Server starts at `http://<your-ip>:8080`
+
+            ### iOS App
+            1. Download `ElyCam-${{ env.VERSION }}-unsigned.ipa`
+            2. Install via [AltStore](https://altstore.io) or [Sideloadly](https://sideloadly.io)
+            3. Open app → enter server IP → connect → stream!
+
+            ### OBS Studio
+            1. Add **Browser Source** → URL: `http://<your-ip>:8080/view?cam=cam1`
+            2. Set resolution to match camera output
+            
+            ---
+            📖 See [README](https://github.com/elycde/ElyCam#readme) for full documentation.
+          files: |
+            release-assets/*
