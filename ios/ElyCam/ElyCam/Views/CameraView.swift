@@ -14,7 +14,7 @@
 // 6. On peer-left → clean up WebRTC, wait for next subscriber
 
 import SwiftUI
-import WebRTC
+@preconcurrency import WebRTC
 import os
 
 // MARK: - Camera View
@@ -214,7 +214,7 @@ struct CameraView: View {
 /// Bridges delegate callbacks from SignalingService and WebRTCService
 /// into SwiftUI-friendly state updates. This class is the "glue" that
 /// orchestrates the signaling + WebRTC + camera pipeline.
-final class StreamCoordinator: NSObject, SignalingServiceDelegate, WebRTCServiceDelegate {
+final class StreamCoordinator: NSObject, SignalingServiceDelegate, WebRTCServiceDelegate, @unchecked Sendable {
     
     private let signalingService: SignalingService
     private let webRTCService: WebRTCService

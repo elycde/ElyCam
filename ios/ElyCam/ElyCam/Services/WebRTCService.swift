@@ -9,7 +9,7 @@
 // - Video and audio track management
 
 import Foundation
-import WebRTC
+@preconcurrency import WebRTC
 import os
 
 // MARK: - WebRTC Delegate
@@ -26,7 +26,7 @@ protocol WebRTCServiceDelegate: AnyObject {
 
 // MARK: - WebRTC Service
 
-final class WebRTCService: NSObject {
+final class WebRTCService: NSObject, @unchecked Sendable {
     
     // MARK: Properties
     

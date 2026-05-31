@@ -34,7 +34,7 @@ protocol SignalingServiceDelegate: AnyObject {
 
 // MARK: - Signaling Service
 
-final class SignalingService: NSObject {
+final class SignalingService: NSObject, @unchecked Sendable {
     
     // MARK: Properties
     

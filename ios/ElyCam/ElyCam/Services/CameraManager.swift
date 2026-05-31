@@ -7,10 +7,10 @@
 
 import Foundation
 import AVFoundation
-import WebRTC
+@preconcurrency import WebRTC
 import os
 
-final class CameraManager: ObservableObject {
+final class CameraManager: ObservableObject, @unchecked Sendable {
     
     // MARK: Published Properties
     

@@ -5,7 +5,7 @@
 // Displays the local camera preview by subscribing to the RTCVideoTrack.
 
 import SwiftUI
-import WebRTC
+@preconcurrency import WebRTC
 
 struct VideoPreviewView: UIViewRepresentable {
     
