@@ -12,8 +12,8 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 packages:
   WebRTC:
-    url: https://github.com/nicklama/nicklama-webrtc-build
-    from: "130.0.0"
+    url: https://github.com/stasel/WebRTC.git
+    from: "147.0.0"
 targets:
   ElyCam:
     type: application
